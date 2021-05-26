@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -37,7 +38,7 @@ func (h *Handler) Serve(addr string) error {
 
 func (h *Handler) registerHandlers() {
 	/*
-		GET /devices
+		GET /devices?interface=<network_interface>&timeout=<seconds>
 		POST /connect?uuid=<device_uuid>&addr=<device_addr>&port=<device_port>
 		POST /disconnect?uuid=<device_uuid>
 		POST /disconnect-all
@@ -74,12 +75,28 @@ func (h *Handler) registerHandlers() {
 
 func (h *Handler) listDevices(w http.ResponseWriter, r *http.Request) {
 	h.log("listing chromecast devices")
+	q := r.URL.Query()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	timeout, err := strconv.Atoi(q.Get("timeout"))
+	if err != nil {
+		timeout = 3
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
+	var iface *net.Interface
+	if ifaceParam := q.Get("interface"); ifaceParam != "" {
+		iface, err = net.InterfaceByName(ifaceParam)
+		if err != nil {
+			h.log("error resolving interface: %v", err)
+			httpError(w, fmt.Errorf("unable to resolve interface: %v", err))
+			return
+		}
+	}
+
 	// TODO: Get iface from query params
-	devicesChan, err := dns.DiscoverCastDNSEntries(ctx, nil)
+	devicesChan, err := dns.DiscoverCastDNSEntries(ctx, iface)
 	if err != nil {
 		h.log("error discovering entries: %v", err)
 		httpError(w, fmt.Errorf("unable to discover cast dns entries: %v", err))

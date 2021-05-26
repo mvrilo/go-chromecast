@@ -246,7 +246,7 @@ $ go-chromecast --with-ui load /path/to/file.flac
 There is a HTTP API server provided that has the following api:
 
 ```
-GET /devices
+GET /devices?interface=<network_interface>&timeout=<seconds>
 POST /connect?uuid=<device_uuid>&addr=<device_addr>&port=<device_port>
 POST /disconnect?uuid=<device_uuid>
 POST /disconnect-all
